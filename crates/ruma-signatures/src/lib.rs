@@ -17,7 +17,7 @@
 //! are also required to contain hashes of their content, which are similarly stored within the
 //! hashed JSON object under a `hashes` key.
 //!
-//! In JSON representations, both signatures and hashes appear as Base64-encoded strings, using the
+//! In JSON representations, both signatures and hashes appear as base64-encoded strings, using the
 //! standard character set, without padding.
 //!
 //! # Signing and hashing

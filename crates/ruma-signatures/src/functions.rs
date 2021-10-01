@@ -9,7 +9,7 @@ use std::{
 
 use base64::{decode_config, encode_config, Config, STANDARD_NO_PAD, URL_SAFE_NO_PAD};
 use ruma_identifiers::{EventId, RoomVersionId, ServerName, UserId};
-use ruma_serde::{CanonicalJsonObject, CanonicalJsonValue};
+use ruma_serde::{Base64, CanonicalJsonObject, CanonicalJsonValue};
 use serde_json::{from_str as from_json_str, to_string as to_json_string};
 use sha2::{digest::Digest, Sha256};
 
@@ -331,7 +331,7 @@ where
 
 /// Creates a *content hash* for an event.
 ///
-/// Returns the hash as a Base64-encoded string, using the standard character set, without padding.
+/// Returns the hash as a base64-encoded string, using the standard character set, without padding.
 ///
 /// The content hash of an event covers the complete event including the unredacted contents. It is
 /// used during federation and is described in the Matrix server-server specification.
@@ -343,7 +343,7 @@ where
 /// # Errors
 ///
 /// Returns an error if the event is too large.
-pub fn content_hash(object: &CanonicalJsonObject) -> Result<String, Error> {
+pub fn content_hash(object: &CanonicalJsonObject) -> Result<Base64<[u8; 32]>, Error> {
     let json = canonical_json_with_fields_to_remove(object, CONTENT_HASH_FIELDS_TO_REMOVE)?;
     if json.len() > MAX_PDU_BYTES {
         return Err(Error::PduSize);
@@ -351,12 +351,12 @@ pub fn content_hash(object: &CanonicalJsonObject) -> Result<String, Error> {
 
     let hash = Sha256::digest(json.as_bytes());
 
-    Ok(encode_config(&hash, STANDARD_NO_PAD))
+    Ok(Base64::new(hash.into()))
 }
 
 /// Creates a *reference hash* for an event.
 ///
-/// Returns the hash as a Base64-encoded string, using the standard character set, without padding.
+/// Returns the hash as a base64-encoded string, using the standard character set, without padding.
 ///
 /// The reference hash of an event covers the essential fields of an event, including content
 /// hashes. It is used to generate event identifiers and is described in the Matrix server-server
@@ -503,7 +503,7 @@ where
 
     match hashes_value {
         CanonicalJsonValue::Object(hashes) => {
-            hashes.insert("sha256".into(), CanonicalJsonValue::String(hash))
+            hashes.insert("sha256".into(), CanonicalJsonValue::String(hash.encode()))
         }
         _ => return Err(JsonError::not_of_type("hashes", JsonType::Object)),
     };
@@ -673,7 +673,7 @@ pub fn verify_event(
 
     let calculated_hash = content_hash(object)?;
 
-    if *hash == calculated_hash {
+    if hash.as_bytes() == calculated_hash.as_bytes() {
         Ok(Verified::All)
     } else {
         Ok(Verified::Signatures)

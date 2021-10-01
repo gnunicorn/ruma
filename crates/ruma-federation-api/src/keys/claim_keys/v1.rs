@@ -55,7 +55,7 @@ pub type OneTimeKeys =
 #[cfg_attr(not(feature = "unstable-exhaustive-types"), non_exhaustive)]
 pub struct KeyObject {
     /// The key, encoded using unpadded base64.
-    pub key: String,
+    pub key: Base64,
 
     /// Signature of the key object.
     pub signatures: BTreeMap<Box<UserId>, BTreeMap<Box<DeviceKeyId>, String>>,
@@ -64,7 +64,7 @@ pub struct KeyObject {
 impl KeyObject {
     /// Creates a new `KeyObject` with the given key and signatures.
     pub fn new(
-        key: String,
+        key: Base64,
         signatures: BTreeMap<Box<UserId>, BTreeMap<Box<DeviceKeyId>, String>>,
     ) -> Self {
         Self { key, signatures }

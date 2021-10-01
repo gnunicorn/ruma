@@ -28,12 +28,12 @@ pub struct RoomThirdPartyInviteEventContent {
     #[cfg_attr(feature = "compat", serde(default))]
     pub key_validity_url: String,
 
-    /// A Base64-encoded Ed25519 key with which the token must be signed.
+    /// A base64-encoded Ed25519 key with which the token must be signed.
     ///
     /// If you activate the `compat` feature, this field being absent in JSON will result in an
     /// empty string here during deserialization.
     #[cfg_attr(feature = "compat", serde(default))]
-    pub public_key: String,
+    pub public_key: Base64,
 
     /// Keys with which the token may be signed.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -43,7 +43,7 @@ pub struct RoomThirdPartyInviteEventContent {
 impl RoomThirdPartyInviteEventContent {
     /// Creates a new `RoomThirdPartyInviteEventContent` with the given display name, key validity
     /// url and public key.
-    pub fn new(display_name: String, key_validity_url: String, public_key: String) -> Self {
+    pub fn new(display_name: String, key_validity_url: String, public_key: Base64) -> Self {
         Self { display_name, key_validity_url, public_key, public_keys: None }
     }
 }
@@ -59,13 +59,13 @@ pub struct PublicKey {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub key_validity_url: Option<String>,
 
-    /// A Base64-encoded Ed25519 key with which the token must be signed.
-    pub public_key: String,
+    /// A base64-encoded Ed25519 key with which the token must be signed.
+    pub public_key: Base64,
 }
 
 impl PublicKey {
     /// Creates a new `PublicKey` with the given base64-encoded ed25519 key.
-    pub fn new(public_key: String) -> Self {
+    pub fn new(public_key: Base64) -> Self {
         Self { key_validity_url: None, public_key }
     }
 }

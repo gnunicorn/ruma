@@ -16,13 +16,13 @@ pub mod get_server_version;
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[cfg_attr(not(feature = "unstable-exhaustive-types"), non_exhaustive)]
 pub struct VerifyKey {
-    /// The Unpadded Base64 encoded key.
-    pub key: String,
+    /// The unpadded base64-encoded key.
+    pub key: Base64,
 }
 
 impl VerifyKey {
     /// Creates a new `VerifyKey` from the given key.
-    pub fn new(key: String) -> Self {
+    pub fn new(key: Base64) -> Self {
         Self { key }
     }
 }
@@ -34,7 +34,7 @@ pub struct OldVerifyKey {
     /// Timestamp when this key expired.
     pub expired_ts: MilliSecondsSinceUnixEpoch,
 
-    /// The Unpadded Base64 encoded key.
+    /// The unpadded base64-encoded key.
     pub key: String,
 }
 

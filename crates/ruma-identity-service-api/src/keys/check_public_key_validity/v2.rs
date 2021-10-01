@@ -15,7 +15,7 @@ ruma_api! {
     request: {
         /// Base64-encoded (no padding) public key to check for validity.
         #[ruma_api(query)]
-        pub public_key: &'a str,
+        pub public_key: &'a Base64,
     }
 
     response: {
@@ -26,7 +26,7 @@ ruma_api! {
 
 impl<'a> Request<'a> {
     /// Create a `Request` with the given base64-encoded (unpadded) public key.
-    pub fn new(public_key: &'a str) -> Self {
+    pub fn new(public_key: &'a Base64) -> Self {
         Self { public_key }
     }
 }
