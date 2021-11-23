@@ -1,37 +1,3 @@
-//! A simple bot to demonstrate `ruma-client` functionality. Tells jokes when you ask for them.
-//! # Usage
-//!
-//! Create a file called `config` and populate it with the following values in `key=value` format:
-//! - `homeserver`: Your homeserver URL.
-//! - `username`: The Matrix ID for the bot.
-//! - `password`: The password for the bot.
-//!
-//! For example:
-//!
-//! ```ini
-//! homeserver=http://example.com:8080/
-//! username=@user:example.com
-//! password=yourpassword
-//! ```
-//!
-//! You will need to pre-register the bot account; it doesn't do registration
-//! automatically. The bot will automatically join rooms it is invited to though.
-//!
-//! Finally, run the bot (e.g. using `cargo run`) from the same directory as your
-//! `config` file. The bot should respond to the request "Tell me a joke" in any
-//! channel that it is invited to.
-//!
-//! # Dependencies
-//!
-//! - http = "0.2.2"
-//! - hyper = "0.14.2"
-//! - hyper-tls = "0.5.0"
-//! - ruma = { version = "0.4.0", features = ["client-api-c", "client", "client-hyper-native-tls", "events"] }
-//! - ruma-client = { version = "0.7.0", features = ["client-api"]}
-//! - serde_json = "1.0"
-//! - tokio = { version = "1", features = ["full"] }
-//! - tokio-stream = "0.1.7"
-
 use std::{
     convert::TryInto,
     error::Error,
