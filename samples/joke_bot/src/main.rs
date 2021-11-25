@@ -11,14 +11,14 @@ use ruma::{
     api::client::r0::{filter::FilterDefinition, message::send_message_event, sync::sync_events},
     assign, client,
     events::{
-        room::message::{MessageEventContent, MessageType},
-        AnyMessageEventContent, AnySyncMessageEvent, AnySyncRoomEvent,
+        room::message::{MessageType, RoomMessageEventContent},
+        AnySyncMessageEvent, AnySyncRoomEvent,
     },
     presence::PresenceState,
     serde::Raw,
     RoomId, UserId,
 };
-use serde_json::Value;
+use serde_json::Value as JsonValue;
 use tokio::fs;
 use tokio_stream::StreamExt as _;
 
@@ -35,9 +35,8 @@ type HttpClient = client::http_client::HyperNativeTls;
 type MatrixClient = client::Client<http_client::HyperNativeTls>;
 
 async fn run() -> Result<(), Box<dyn Error>> {
-    let config = read_config()
-        .await
-        .map_err(|e| format!("configuration in ./config is invalid: {}", e))?;
+    let config =
+        read_config().await.map_err(|e| format!("configuration in ./config is invalid: {}", e))?;
     let http_client =
         hyper::Client::builder().build::<_, hyper::Body>(hyper_tls::HttpsConnector::new());
     let matrix_client = if let Some(state) = read_state().await.ok().flatten() {
@@ -49,15 +48,10 @@ async fn run() -> Result<(), Box<dyn Error>> {
     } else if let Some(password) = &config.password {
         let client =
             MatrixClient::with_http_client(http_client.clone(), config.homeserver.to_owned(), None);
-        match client
-            .log_in(config.username.as_ref(), password, None, None)
-            .await
-        {
+        match client.log_in(config.username.as_ref(), password, None, None).await {
             Ok(_) => {
                 if let Err(err) = write_state(&State {
-                    access_token: client
-                        .access_token()
-                        .expect("Matrix access token is missing"),
+                    access_token: client.access_token().expect("Matrix access token is missing"),
                 })
                 .await
                 {
@@ -68,7 +62,7 @@ async fn run() -> Result<(), Box<dyn Error>> {
             Err(e) => {
                 let reason = match e {
                     client::Error::AuthenticationRequired => {
-                        "invalid credentials specified".to_string()
+                        "invalid credentials specified".to_owned()
                     }
                     client::Error::Response(response_err) => {
                         format!("failed to get a response from the server: {}", response_err)
@@ -150,11 +144,10 @@ async fn handle_messages(
                     Ok(joke) => joke,
                     Err(_) => "I thought of a joke... but I just forgot it.".to_owned(),
                 };
-                let joke_content =
-                    AnyMessageEventContent::RoomMessage(MessageEventContent::text_plain(joke));
+                let joke_content = RoomMessageEventContent::text_plain(joke);
 
                 let txn_id = generate_txn_id();
-                let req = send_message_event::Request::new(room_id, &txn_id, &joke_content);
+                let req = send_message_event::Request::new(room_id, &txn_id, &joke_content)?;
                 // Just bail if we can't send the message.
                 let _ = matrix_client.send_request(req).await;
             }
@@ -174,20 +167,11 @@ async fn handle_invitations(
         .await?;
 
     let greeting = "Hello! My name is Mr. Bot! I like to tell jokes. Like this one: ";
-    let joke = get_joke(http_client)
-        .await
-        .map_or_else(|_| "err... never mind.".to_owned(), |j| j);
-    let content = AnyMessageEventContent::RoomMessage(MessageEventContent::text_plain(format!(
-        "{}\n{}",
-        greeting, joke
-    )));
-    matrix_client
-        .send_request(send_message_event::Request::new(
-            room_id,
-            &generate_txn_id(),
-            &content,
-        ))
-        .await?;
+    let joke = get_joke(http_client).await.map_or_else(|_| "err... never mind.".to_owned(), |j| j);
+    let content = RoomMessageEventContent::text_plain(format!("{}\n{}", greeting, joke));
+    let txn_id = generate_txn_id();
+    let message = send_message_event::Request::new(room_id, &txn_id, &content)?;
+    matrix_client.send_request(message).await?;
     Ok(())
 }
 
@@ -209,11 +193,9 @@ async fn get_joke(client: &HttpClient) -> Result<String, Box<dyn Error>> {
     let bytes = hyper::body::to_bytes(rsp).await?;
     let json = String::from_utf8(bytes.to_vec())
         .map_err(|_| "invalid UTF-8 data returned from joke API")?;
-    let joke_obj =
-        serde_json::from_str::<Value>(&json).map_err(|_| "invalid JSON returned from joke API")?;
-    let joke = joke_obj["joke"]
-        .as_str()
-        .ok_or("joke field missing from joke API response")?;
+    let joke_obj = serde_json::from_str::<JsonValue>(&json)
+        .map_err(|_| "invalid JSON returned from joke API")?;
+    let joke = joke_obj["joke"].as_str().ok_or("joke field missing from joke API response")?;
     Ok(joke.to_owned())
 }
 
@@ -251,7 +233,7 @@ async fn read_config() -> Result<Config, io::Error> {
     let lines = content.split('\n');
 
     let mut homeserver = None;
-    let mut username = Err("required field `username` is missing".to_string());
+    let mut username = Err("required field `username` is missing".to_owned());
     let mut password = None;
     for line in lines {
         if let Some((key, value)) = line.split_once('=') {
@@ -259,9 +241,10 @@ async fn read_config() -> Result<Config, io::Error> {
                 "homeserver" => homeserver = Some(value.trim().to_owned()),
                 // TODO: infer domain from `homeserver`
                 "username" => {
-                    username = value.trim().to_owned().try_into().map_err(|e| {
-                        format!("invalid Matrix user ID format for `username`: {}", e)
-                    })
+                    username =
+                        value.trim().to_owned().try_into().map_err(|e| {
+                            format!("invalid Matrix user ID format for `username`: {}", e)
+                        })
                 }
                 "password" => password = Some(value.trim().to_owned()),
                 _ => {}
@@ -270,11 +253,7 @@ async fn read_config() -> Result<Config, io::Error> {
     }
 
     match (homeserver, username) {
-        (Some(homeserver), Ok(username)) => Ok(Config {
-            homeserver,
-            username,
-            password,
-        }),
+        (Some(homeserver), Ok(username)) => Ok(Config { homeserver, username, password }),
         (homeserver, username) => {
             let mut error = String::from("Invalid config specified:");
             if homeserver.is_none() {
