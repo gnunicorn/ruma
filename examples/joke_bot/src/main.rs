@@ -224,7 +224,7 @@ async fn read_state() -> Result<Option<State>, io::Error> {
 
 struct Config {
     homeserver: String,
-    username: UserId,
+    username: Box<UserId>,
     password: Option<String>,
 }
 
