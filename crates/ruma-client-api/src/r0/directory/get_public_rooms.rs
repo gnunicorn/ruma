@@ -84,10 +84,7 @@ mod tests {
             since: Some("hello"),
             server: Some(server_name!("test.tld")),
         }
-        .try_into_http_request::<Vec<u8>>(
-            "https://homeserver.tld",
-            SendAccessToken::IfRequired("auth_tok"),
-        )
+        .try_into_http_request("https://homeserver.tld", SendAccessToken::IfRequired("auth_tok"))
         .unwrap();
 
         let uri = req.uri();

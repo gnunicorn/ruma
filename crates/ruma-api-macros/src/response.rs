@@ -1,6 +1,7 @@
 use std::{
     convert::{TryFrom, TryInto},
     mem,
+    ops::Not,
 };
 
 use proc_macro2::TokenStream;
@@ -63,13 +64,6 @@ struct Response {
 }
 
 impl Response {
-    /// Whether or not this request has any data in the HTTP body.
-    fn has_body_fields(&self) -> bool {
-        self.fields
-            .iter()
-            .any(|f| matches!(f, ResponseField::Body(_) | &ResponseField::NewtypeBody(_)))
-    }
-
     /// Whether or not this request has a single newtype body field.
     fn has_newtype_body(&self) -> bool {
         self.fields.iter().any(|f| matches!(f, ResponseField::NewtypeBody(_)))
@@ -91,21 +85,29 @@ impl Response {
         let ruma_serde = quote! { #ruma_api::exports::ruma_serde };
         let serde = quote! { #ruma_api::exports::serde };
 
-        let response_body_struct = (!self.has_raw_body()).then(|| {
+        let response_body_struct = self.has_raw_body().not().then(|| {
             let serde_attr = self.has_newtype_body().then(|| quote! { #[serde(transparent)] });
-            let fields = self.fields.iter().filter_map(ResponseField::as_body_field);
+            let fields: Vec<_> =
+                self.fields.iter().filter_map(ResponseField::as_body_field).collect();
+
+            // Only derive `Deserialize` if there are any fields, otherwise `FromHttpBody` will be
+            // implemented directly.
+            let derive_deserialize = (!fields.is_empty()).then(|| {
+                quote! { #serde::Deserialize }
+            });
 
             quote! {
                 /// Data in the response body.
+                #[doc(hidden)] // until type_alias_impl_trait works well enough
                 #[derive(
                     Debug,
                     #ruma_api_macros::_FakeDeriveRumaApi,
                     #ruma_serde::Outgoing,
-                    #serde::Deserialize,
                     #serde::Serialize,
+                    #derive_deserialize
                 )]
                 #serde_attr
-                struct ResponseBody { #(#fields),* }
+                pub struct ResponseBody { #(#fields),* }
             }
         });
 

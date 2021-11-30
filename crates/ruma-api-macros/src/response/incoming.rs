@@ -1,3 +1,5 @@
+use std::ops::Not;
+
 use proc_macro2::TokenStream;
 use quote::quote;
 use syn::Type;
@@ -8,7 +10,6 @@ impl Response {
     pub fn expand_incoming(&self, error_ty: &Type, ruma_api: &TokenStream) -> TokenStream {
         let http = quote! { #ruma_api::exports::http };
         let ruma_serde = quote! { #ruma_api::exports::ruma_serde };
-        let serde_json = quote! { #ruma_api::exports::serde_json };
 
         let extract_response_headers = self.has_header_fields().then(|| {
             quote! {
@@ -16,24 +17,12 @@ impl Response {
             }
         });
 
-        let typed_response_body_decl = self.has_body_fields().then(|| {
+        let extract_body = self.has_raw_body().not().then(|| {
             quote! {
                 let response_body: <
                     ResponseBody
                     as #ruma_serde::Outgoing
-                >::Incoming = {
-                    let body = ::std::convert::AsRef::<[::std::primitive::u8]>::as_ref(
-                        response.body(),
-                    );
-
-                    #serde_json::from_slice(match body {
-                        // If the response body is completely empty, pretend it is an empty
-                        // JSON object instead. This allows responses with only optional body
-                        // parameters to be deserialized in that case.
-                        [] => b"{}",
-                        b => b,
-                    })?
-                };
+                >::Incoming = response.into_body();
             }
         });
 
@@ -112,33 +101,24 @@ impl Response {
             #[automatically_derived]
             #[cfg(feature = "client")]
             impl #ruma_api::IncomingResponse for Response {
+                type IncomingBody = ResponseBody;
+                // impl #ruma_api::FromHttpBody<
+                //     #ruma_api::error::FromHttpResponseError<Self::EndpointError>,
+                // >;
                 type EndpointError = #error_ty;
 
-                fn try_from_http_response<T: ::std::convert::AsRef<[::std::primitive::u8]>>(
-                    response: #http::Response<T>,
+                fn try_from_http_response(
+                    response: #http::Response<Self::IncomingBody>,
                 ) -> ::std::result::Result<
                     Self,
                     #ruma_api::error::FromHttpResponseError<#error_ty>,
                 > {
-                    if response.status().as_u16() < 400 {
-                        #extract_response_headers
-                        #typed_response_body_decl
+                    #extract_response_headers
+                    #extract_body
 
-                        ::std::result::Result::Ok(Self {
-                            #response_init_fields
-                        })
-                    } else {
-                        match <#error_ty as #ruma_api::EndpointError>::try_from_http_response(
-                            response
-                        ) {
-                            ::std::result::Result::Ok(err) => {
-                                Err(#ruma_api::error::ServerError::Known(err).into())
-                            }
-                            ::std::result::Result::Err(response_err) => {
-                                Err(#ruma_api::error::ServerError::Unknown(response_err).into())
-                            }
-                        }
-                    }
+                    ::std::result::Result::Ok(Self {
+                        #response_init_fields
+                    })
                 }
             }
         }

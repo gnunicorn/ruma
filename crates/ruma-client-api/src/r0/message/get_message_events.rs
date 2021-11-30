@@ -194,7 +194,7 @@ mod tests {
         };
 
         let request = req
-            .try_into_http_request::<Vec<u8>>(
+            .try_into_http_request(
                 "https://homeserver.tld",
                 SendAccessToken::IfRequired("auth_tok"),
             )

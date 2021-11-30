@@ -83,7 +83,7 @@ mod tests {
 
         assert_matches!(
             super::Request::new(user_id!("@foo:bar.com"), FilterDefinition::default())
-                .try_into_http_request::<Vec<u8>>(
+                .try_into_http_request(
                     "https://matrix.org",
                     SendAccessToken::IfRequired("tok"),
                 ),

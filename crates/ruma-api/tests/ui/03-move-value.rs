@@ -1,3 +1,5 @@
+// #![feature(type_alias_impl_trait)]
+
 // This tests that the "body" fields are moved after all other fields because they
 // consume the request/response.
 

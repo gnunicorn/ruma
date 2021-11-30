@@ -1,3 +1,5 @@
+use std::ops::Not;
+
 use proc_macro2::{Ident, Span, TokenStream};
 use quote::quote;
 use syn::Field;
@@ -10,7 +12,6 @@ impl Request {
         let http = quote! { #ruma_api::exports::http };
         let percent_encoding = quote! { #ruma_api::exports::percent_encoding };
         let ruma_serde = quote! { #ruma_api::exports::ruma_serde };
-        let serde_json = quote! { #ruma_api::exports::serde_json };
 
         let method = &self.method;
         let error_ty = &self.error_ty;
@@ -170,30 +171,18 @@ impl Request {
             (TokenStream::new(), TokenStream::new())
         };
 
-        let extract_body = self.has_body_fields().then(|| {
-            let body_lifetimes = (!self.lifetimes.body.is_empty()).then(|| {
-                // duplicate the anonymous lifetime as many times as needed
-                let lifetimes = std::iter::repeat(quote! { '_ }).take(self.lifetimes.body.len());
-                quote! { < #( #lifetimes, )* > }
-            });
+        let body_lifetimes = self.lifetimes.body.is_empty().not().then(|| {
+            // duplicate the anonymous lifetime as many times as needed
+            let lifetimes = std::iter::repeat(quote! { '_ }).take(self.lifetimes.body.len());
+            quote! { < #( #lifetimes, )* > }
+        });
 
+        let extract_body = self.has_raw_body().not().then(|| {
             quote! {
                 let request_body: <
                     RequestBody #body_lifetimes
                     as #ruma_serde::Outgoing
-                >::Incoming = {
-                    let body = ::std::convert::AsRef::<[::std::primitive::u8]>::as_ref(
-                        request.body(),
-                    );
-
-                    #serde_json::from_slice(match body {
-                        // If the request body is completely empty, pretend it is an empty JSON
-                        // object instead. This allows requests with only optional body parameters
-                        // to be deserialized in that case.
-                        [] => b"{}",
-                        b => b,
-                    })?
-                };
+                >::Incoming = request.into_body();
             }
         });
 
@@ -221,13 +210,16 @@ impl Request {
             #[automatically_derived]
             #[cfg(feature = "server")]
             impl #ruma_api::IncomingRequest for #incoming_request_type {
+                type IncomingBody =
+                    <RequestBody #body_lifetimes as #ruma_serde::Outgoing>::Incoming;
+                    //impl #ruma_api::FromHttpBody<#ruma_api::error::FromHttpRequestError>;
                 type EndpointError = #error_ty;
                 type OutgoingResponse = Response;
 
-                const METADATA: #ruma_api::Metadata = self::METADATA;
+                const METADATA: #ruma_api::Metadata = METADATA;
 
-                fn try_from_http_request<T: ::std::convert::AsRef<[::std::primitive::u8]>>(
-                    request: #http::Request<T>,
+                fn try_from_http_request(
+                    request: #http::Request<Self::IncomingBody>,
                 ) -> ::std::result::Result<Self, #ruma_api::error::FromHttpRequestError> {
                     if request.method() != #http::Method::#method {
                         return Err(#ruma_api::error::FromHttpRequestError::MethodMismatch {

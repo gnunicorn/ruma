@@ -1,3 +1,5 @@
+// #![feature(type_alias_impl_trait)]
+
 use bytes::BufMut;
 use ruma_api::{
     error::{FromHttpResponseError, IntoHttpError, MatrixError},

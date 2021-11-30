@@ -2,6 +2,7 @@ use std::{
     collections::BTreeSet,
     convert::{TryFrom, TryInto},
     mem,
+    ops::Not,
 };
 
 use proc_macro2::TokenStream;
@@ -129,6 +130,10 @@ impl Request {
         self.fields.iter().any(|f| matches!(f, RequestField::NewtypeBody(_)))
     }
 
+    fn has_raw_body(&self) -> bool {
+        self.fields.iter().any(|f| matches!(f, RequestField::RawBody(_)))
+    }
+
     fn has_header_fields(&self) -> bool {
         self.fields.iter().any(|f| matches!(f, RequestField::Header(..)))
     }
@@ -170,19 +175,30 @@ impl Request {
         let ruma_serde = quote! { #ruma_api::exports::ruma_serde };
         let serde = quote! { #ruma_api::exports::serde };
 
-        let request_body_struct = self.has_body_fields().then(|| {
+        let request_body_struct = self.has_raw_body().not().then(|| {
             let serde_attr = self.has_newtype_body().then(|| quote! { #[serde(transparent)] });
-            let fields = self.fields.iter().filter_map(RequestField::as_body_field);
+            let fields: Vec<_> =
+                self.fields.iter().filter_map(RequestField::as_body_field).collect();
 
             // Though we don't track the difference between newtype body and body
             // for lifetimes, the outer check and the macro failing if it encounters
             // an illegal combination of field attributes, is enough to guarantee
             // `body_lifetimes` correctness.
             let lifetimes = &self.lifetimes.body;
-            let derive_deserialize = lifetimes.is_empty().then(|| quote! { #serde::Deserialize });
+
+            // If there are fields but they all have no lifetimes, don't derive `Deserialize`
+            // because it will be derived for the incoming struct instead.
+            let derive_deserialize = (!fields.is_empty() && lifetimes.is_empty())
+                .then(|| quote! { #serde::Deserialize });
+
+            // If there are no fields, don't derive `Deserialize` for the incoming struct because
+            // `FromHttpBody` will be implemented for it directly.
+            let incoming_derive =
+                fields.is_empty().then(|| quote! { #[incoming_derive(!Deserialize)] });
 
             quote! {
                 /// Data in the request body.
+                #[doc(hidden)] // until type_alias_impl_trait works well enough
                 #[derive(
                     Debug,
                     #ruma_api_macros::_FakeDeriveRumaApi,
@@ -191,7 +207,8 @@ impl Request {
                     #derive_deserialize
                 )]
                 #serde_attr
-                struct RequestBody< #(#lifetimes),* > { #(#fields),* }
+                #incoming_derive
+                pub struct RequestBody< #(#lifetimes),* > { #(#fields),* }
             }
         });
 
