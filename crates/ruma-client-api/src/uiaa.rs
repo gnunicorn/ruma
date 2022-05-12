@@ -12,7 +12,7 @@ use ruma_common::{
     },
     serde::{from_raw_json_value, Incoming, JsonObject, StringEnum},
     thirdparty::Medium,
-    ClientSecret, SessionId,
+    ClientSecret, OwnedSessionId, OwnedUserId, UserId,
 };
 use serde::{
     de::{self, DeserializeOwned},
@@ -590,6 +590,25 @@ pub enum UserIdentifier<'a> {
     },
 }
 
+impl<'a> UserIdentifier<'a> {
+    /// Creates a [`UserIdentifier::ThirdPartyId`] from an email address.
+    pub fn email(address: &'a str) -> Self {
+        Self::ThirdPartyId { address, medium: Medium::Email }
+    }
+}
+
+impl<'a> From<&'a UserId> for UserIdentifier<'a> {
+    fn from(id: &'a UserId) -> Self {
+        Self::UserIdOrLocalpart(id.as_str())
+    }
+}
+
+impl<'a> From<&'a OwnedUserId> for UserIdentifier<'a> {
+    fn from(id: &'a OwnedUserId) -> Self {
+        Self::UserIdOrLocalpart(id.as_str())
+    }
+}
+
 impl IncomingUserIdentifier {
     pub(crate) fn to_outgoing(&self) -> UserIdentifier<'_> {
         match self {
@@ -607,7 +626,7 @@ impl IncomingUserIdentifier {
 #[cfg_attr(not(feature = "unstable-exhaustive-types"), non_exhaustive)]
 pub struct ThirdpartyIdCredentials {
     /// Identity server session ID.
-    pub sid: Box<SessionId>,
+    pub sid: OwnedSessionId,
 
     /// Identity server client secret.
     pub client_secret: Box<ClientSecret>,
@@ -623,7 +642,7 @@ impl ThirdpartyIdCredentials {
     /// Creates a new `ThirdpartyIdCredentials` with the given session ID, client secret, identity
     /// server address and access token.
     pub fn new(
-        sid: Box<SessionId>,
+        sid: OwnedSessionId,
         client_secret: Box<ClientSecret>,
         id_server: String,
         id_access_token: String,

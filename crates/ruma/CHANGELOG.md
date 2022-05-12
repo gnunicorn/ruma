@@ -1,5 +1,31 @@
 # [unreleased]
 
+# 0.6.2
+
+Improvements:
+
+* Add `StrippedPowerLevelsEvent::power_levels`
+* Add (`Sync`)`RoomMemberEvent::membership`
+* Export `events::room::member::Change`
+  * Prior to this, you couldn't actually do anything with the
+    `membership_change` functions on various member event types
+
+# 0.6.1
+
+Improvements:
+
+* Re-export `ruma-common`s `js` Cargo feature
+
+# 0.6.0
+
+Please refer to the changelogs of:
+
+* ruma-common 0.9.0
+* ruma-client-api 0.14.0
+* ruma-federation-api 0.5.0
+* ruma-identity-service-api 0.5.0
+* ruma-state-res 0.7.0
+
 # 0.5.0
 
 Please refer to the changelogs of:

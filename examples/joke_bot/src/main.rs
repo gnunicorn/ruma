@@ -13,7 +13,7 @@ use ruma::{
     },
     presence::PresenceState,
     serde::Raw,
-    RoomId, TransactionId, UserId,
+    OwnedUserId, RoomId, TransactionId, UserId,
 };
 use serde_json::Value as JsonValue;
 use tokio::fs;
@@ -223,7 +223,7 @@ async fn read_state() -> io::Result<Option<State>> {
 
 struct Config {
     homeserver: String,
-    username: Box<UserId>,
+    username: OwnedUserId,
     password: Option<String>,
 }
 
@@ -259,7 +259,8 @@ async fn read_config() -> io::Result<Config> {
                 error.push_str("\n  required field `homeserver` is missing")
             }
             if let Err(e) = username {
-                error.push_str(&format!("\n  {}", e))
+                error.push_str("\n  ");
+                error.push_str(&e);
             }
             Err(io::Error::new(io::ErrorKind::InvalidData, error))
         }

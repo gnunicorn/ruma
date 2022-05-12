@@ -1,6 +1,6 @@
 use proc_macro2::{Span, TokenStream};
 use quote::quote;
-use syn::{Ident, LitStr};
+use syn::{parse_quote, Ident, LitStr};
 
 use super::event_parse::{EventEnumEntry, EventEnumInput, EventKind};
 
@@ -38,6 +38,7 @@ pub fn expand_event_type_enum(
     let presence = vec![EventEnumEntry {
         attrs: vec![],
         ev_type: LitStr::new("m.presence", Span::call_site()),
+        ev_path: parse_quote! { #ruma_common::events::presence },
     }];
     let mut all = input.enums.iter().map(|e| &e.events).collect::<Vec<_>>();
     all.push(&presence);
@@ -130,7 +131,7 @@ fn generate_enum(
             let ev_type = &e.ev_type;
 
             Ok(if let Some(prefix) = ev_type.value().strip_suffix(".*") {
-                let fstr = prefix.to_owned() + "{}";
+                let fstr = prefix.to_owned() + ".{}";
                 quote! { #start(_s) => ::std::borrow::Cow::Owned(::std::format!(#fstr, _s)) }
             } else {
                 quote! { #start => ::std::borrow::Cow::Borrowed(#ev_type) }
@@ -160,6 +161,37 @@ fn generate_enum(
             Ok(quote! { #(#attrs)* #match_arm })
         })
         .collect::<syn::Result<_>>()?;
+
+    let from_ident_for_room = if ident == "StateEventType" || ident == "MessageLikeEventType" {
+        let match_arms: Vec<_> = deduped
+            .iter()
+            .map(|e| {
+                let v = e.to_variant()?;
+                let ident_var = v.match_arm(quote! { #ident });
+                let room_var = v.ctor(quote! { Self });
+
+                Ok(if e.has_type_fragment() {
+                    quote! { #ident_var (_s) => #room_var (_s) }
+                } else {
+                    quote! { #ident_var => #room_var }
+                })
+            })
+            .collect::<syn::Result<_>>()?;
+
+        Some(quote! {
+            #[allow(deprecated)]
+            impl ::std::convert::From<#ident> for RoomEventType {
+                fn from(s: #ident) -> Self {
+                    match s {
+                        #(#match_arms,)*
+                        #ident ::_Custom(_s) => Self::_Custom(_s),
+                    }
+                }
+            }
+        })
+    } else {
+        None
+    };
 
     Ok(quote! {
         #[doc = #enum_doc]
@@ -233,5 +265,7 @@ fn generate_enum(
                 self.to_cow_str().serialize(serializer)
             }
         }
+
+        #from_ident_for_room
     })
 }

@@ -1,5 +1,31 @@
 # [unreleased]
 
+Breaking changes:
+
+* Add `user_id` field to `PushConditionRoomCtx`
+
+Improvements:
+
+* All push rules are now considered to not apply to events sent by the user themselves
+
+# 0.9.2
+
+Bug fixes:
+
+* Fix serialization and deserialization of events with a dynamic `event_type`
+
+# 0.9.1
+
+Improvements:
+
+* Add `StrippedPowerLevelsEvent::power_levels`
+* Add (`Sync`)`RoomMemberEvent::membership`
+* Export `events::room::member::Change`
+  * Prior to this, you couldn't actually do anything with the
+    `membership_change` functions on various member event types
+
+# 0.9.0
+
 Bug fixes:
 
 * Change default `invite` power level to `0`
@@ -22,6 +48,9 @@ Breaking changes:
 * Fix the `RoomMessageEventContent::*_reply_plain` methods that now return a
   message with a `formatted_body`, according to the spec. Therefore, they only
   accept `OriginalRoomMessageEvent`s like their HTML counterparts.
+* Update the `state_key` field of state events to be of a different type
+  depending on the content type. You now no longer need to validate manually
+  that `m.room.member` events have a user ID as their state key!
 
 Improvements:
 
@@ -30,6 +59,8 @@ Improvements:
 * Add unstable support for voice messages (MSC3245)
 * Add unstable support for threads (MSC3440)
 * Add `ReceiptEventContent::user_receipt`
+* Make `Restricted::allow` public
+* Conversion from `RoomPowerLevels` to `RoomPowerLevelsEventContent`
 
 # 0.8.0
 
